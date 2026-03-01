@@ -116,6 +116,7 @@ body.light .sl-line-h { background:rgba(60,30,10,0.08); }
 .tb-day  { font-family:'Cormorant Garamond',serif; font-size:11px; font-weight:300; letter-spacing:0.22em; color:var(--tm); text-transform:uppercase; margin-bottom:1px; }
 .tb-date { font-family:'Cormorant Garamond',serif; font-size:28px; font-weight:300; color:var(--tp); line-height:1.05; }
 .tb-date span { font-style:italic; color:var(--tm); font-size:18px; }
+.tb-time { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.12em; color:var(--td); margin-top:3px; }
 
 .tb-right { display:flex; align-items:center; gap:12px; padding-top:6px; }
 
@@ -397,8 +398,9 @@ body.light .d-box.today  { background:rgba(60,30,10,0.10); border:1px solid rgba
   <!-- TOP BAR -->
   <div class="topbar">
     <div class="tb-left">
-      <div class="tb-day">Sunday</div>
-      <div class="tb-date">March 1 <span>/ 2026</span></div>
+      <div class="tb-day" id="tbDay"></div>
+      <div class="tb-date" id="tbDate"></div>
+      <div class="tb-time" id="tbTime"></div>
     </div>
     <div class="tb-right">
       <div class="dday-badge" id="ddayBadge">
@@ -514,7 +516,7 @@ body.light .d-box.today  { background:rgba(60,30,10,0.10); border:1px solid rgba
     <!-- ===== YEAR TAB ===== -->
     <div class="tab-panel" id="panel-year">
       <div class="year-panel-inner">
-        <div class="year-label">2026</div>
+        <div class="year-label" id="yearLabel"></div>
         <div id="yearGrid"></div>
       </div>
     </div>
@@ -558,7 +560,7 @@ body.light .d-box.today  { background:rgba(60,30,10,0.10); border:1px solid rgba
 <div class="hol-overlay" id="holOverlay" onclick="closeHolOuter(event)">
   <div class="hol-dialog">
     <div class="hol-month" id="holMonth"></div>
-    <div class="hol-sub2">2026 · india</div>
+    <div class="hol-sub2" id="holSub"></div>
     <div id="holContent"></div>
     <button class="hol-close" onclick="closeHol()">close</button>
   </div>
@@ -647,7 +649,8 @@ body.light .d-box.today  { background:rgba(60,30,10,0.10); border:1px solid rgba
 // ============================================================
 //  DATA
 // ============================================================
-const TODAY = new Date(2026,2,1); TODAY.setHours(0,0,0,0);
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+const THIS_YEAR = TODAY.getFullYear();
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DIM    = [31,28,28,31,30,31,30,31,31,30,31,30,31]; // days per month (index 1-based, 0 unused)
 
@@ -706,6 +709,8 @@ window.addEventListener('load', () => {
 });
 
 function init() {
+  updateClock();
+  setInterval(updateClock, 1000);
   renderTasks(); buildGrid(); renderDdays(); renderBlists();
   renderSlider(); updateDdayBadge();
   // Event listeners
@@ -716,7 +721,7 @@ function init() {
   document.getElementById('bNameInp').addEventListener('keydown', e => { if(e.key==='Enter') addBitem(); if(e.key==='Escape') toggleBInput(); });
   document.getElementById('ddayName').addEventListener('keydown', e => { if(e.key==='Escape') toggleDdayAdd(); });
   document.getElementById('aiInput').addEventListener('keydown', e => { if(e.key==='Enter') sendAI(); });
-  document.getElementById('ddayDate').min = '2026-01-01';
+  document.getElementById('ddayDate').min = TODAY.toISOString().split('T')[0];
   document.getElementById('ddayBadge').onclick = () => {
     // Scroll to countdowns on day tab or switch to day tab
     if (curTab !== 'day') switchTab('day');
@@ -885,22 +890,54 @@ function addDday() {
 // ============================================================
 //  YEAR GRID
 // ============================================================
-function fakeRating(m,d) { const s=(m*31+d)%7; return s===0?0:(s%5)+1; }
+// ============================================================
+//  LIVE DATE + IST CLOCK
+// ============================================================
+const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function updateClock() {
+  const now = new Date();
+  // IST = UTC+5:30
+  const ist = new Date(now.toLocaleString('en-US', {timeZone:'Asia/Kolkata'}));
+
+  // Day name
+  document.getElementById('tbDay').textContent = DAY_NAMES[ist.getDay()];
+
+  // Date
+  const dateEl = document.getElementById('tbDate');
+  dateEl.innerHTML = `${MONTH_NAMES[ist.getMonth()]} ${ist.getDate()} <span>/ ${ist.getFullYear()}</span>`;
+
+  // Time IST
+  let h = ist.getHours(), m = ist.getMinutes(), s = ist.getSeconds();
+  const ampm = h >= 12 ? 'pm' : 'am';
+  h = h % 12 || 12;
+  const timeStr = `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} ${ampm} IST`;
+  document.getElementById('tbTime').textContent = timeStr;
+}
+
+// ============================================================
+//  YEAR GRID — no fake ratings, just past-none for unrated
+// ============================================================
+function fakeRating(m,d) { return 0; } // all past days show as unrated until user rates them
 function buildGrid() {
   const grid=document.getElementById('yearGrid'); if(grid.childElementCount>0) return;
+  document.getElementById('yearLabel').textContent = THIS_YEAR;
+  document.getElementById('holSub').textContent = THIS_YEAR + ' · india';
   const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   for (let m=1; m<=12; m++) {
-    const gaz = (GAZETTE[m]||[]).filter(h => { const dow=new Date(2026,m-1,h.d).getDay(); return dow!==0&&dow!==6; });
+    const daysInMonth = new Date(THIS_YEAR, m, 0).getDate();
+    const gaz = (GAZETTE[m]||[]).filter(h => { const dow=new Date(THIS_YEAR,m-1,h.d).getDay(); return dow!==0&&dow!==6; });
     const row=document.createElement('div'); row.className='m-row';
     const meta=document.createElement('div'); meta.className='m-meta';
-    meta.innerHTML=`<div class="m-name">${MONTHS[m-1].slice(0,3)}</div><div class="hol-ct${gaz.length?' has':''}" onclick="openHol(${m})">${gaz.length?gaz.length+(gaz.length===1?' hol':' hols'):'—'}</div>`;
+    meta.innerHTML=`<div class="m-name">${MONTH_NAMES[m-1].slice(0,3)}</div><div class="hol-ct${gaz.length?' has':''}" onclick="openHol(${m})">${gaz.length?gaz.length+(gaz.length===1?' hol':' hols'):'—'}</div>`;
     const dw=document.createElement('div'); dw.className='days-g';
-    for (let d=1; d<=DIM[m]; d++) {
-      const date=new Date(2026,m-1,d), isPast=date<TODAY, isToday=date.getTime()===TODAY.getTime();
+    for (let d=1; d<=daysInMonth; d++) {
+      const date=new Date(THIS_YEAR,m-1,d), isPast=date<TODAY, isToday=date.getTime()===TODAY.getTime();
       const box=document.createElement('div'); box.className=`d-box m${m}`;
-      if (isToday)       box.classList.add('today');
-      else if (isPast)   { const r=fakeRating(m,d); box.classList.add(r===0?'past-none':`r${r}`); }
-      else               box.classList.add('future');
+      if (isToday)     box.classList.add('today');
+      else if (isPast) box.classList.add('past-none');
+      else             box.classList.add('future');
       dw.appendChild(box);
     }
     row.appendChild(meta); row.appendChild(dw); grid.appendChild(row);
@@ -912,10 +949,10 @@ function buildGrid() {
 // ============================================================
 function openHol(m) {
   const gaz=GAZETTE[m]||[], obs=OBSERVANCES[m]||[], DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  document.getElementById('holMonth').textContent=MONTHS[m-1];
+  document.getElementById('holMonth').textContent=MONTH_NAMES[m-1];
   let html='';
-  if (gaz.length) { html+=`<div class="hol-sl">Public Holidays</div>`; gaz.forEach(h=>{const dow=new Date(2026,m-1,h.d).getDay();html+=`<div class="hol-item"><span class="hol-d">${h.d} ${DN[dow]}</span><span class="hol-n">${h.n}</span></div>`;});}
-  if (obs.length) { html+=`<div class="hol-sl">Observances</div>`;     obs.forEach(h=>{const dow=new Date(2026,m-1,h.d).getDay();html+=`<div class="hol-item"><span class="hol-d">${h.d} ${DN[dow]}</span><span class="hol-n">${h.n}</span></div>`;});}
+  if (gaz.length) { html+=`<div class="hol-sl">Public Holidays</div>`; gaz.forEach(h=>{const dow=new Date(THIS_YEAR,m-1,h.d).getDay();html+=`<div class="hol-item"><span class="hol-d">${h.d} ${DN[dow]}</span><span class="hol-n">${h.n}</span></div>`;});}
+  if (obs.length) { html+=`<div class="hol-sl">Observances</div>`;     obs.forEach(h=>{const dow=new Date(THIS_YEAR,m-1,h.d).getDay();html+=`<div class="hol-item"><span class="hol-d">${h.d} ${DN[dow]}</span><span class="hol-n">${h.n}</span></div>`;});}
   if (!gaz.length&&!obs.length) html=`<div class="hol-item"><span class="hol-n" style="font-style:italic;color:var(--td)">Nothing notable this month.</span></div>`;
   document.getElementById('holContent').innerHTML=html;
   document.getElementById('holOverlay').classList.add('open');
@@ -945,7 +982,7 @@ async function sendAI() {
       body: JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:1000,
-        system:`You are Claude, an AI assistant embedded inside a personal daily tracker app. Today is March 1, 2026. The user tracks their daily tasks, rates their day on a scale of I to V, manages a backlog, and monitors countdown timers for important events. Be warm, thoughtful, and concise. When asked about the user's progress or wellbeing, be encouraging but real.`,
+        system:`You are Claude, an AI assistant embedded inside a personal daily tracker app. Today is ${new Date().toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'long',year:'numeric',month:'long',day:'numeric'})}. The user tracks their daily tasks, rates their day on a scale of I to V, manages a backlog, and monitors countdown timers for important events. Be warm, thoughtful, and concise. When asked about the user's progress or wellbeing, be encouraging but real.`,
         messages:[{role:'user', content:text}]
       })
     });
