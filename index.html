@@ -20,11 +20,11 @@
   --card:         #141310;
   --border:       #2a2720;
   --border2:      #1e1c19;
-  --tp:           #f5efe2;   /* text primary   */
-  --ts:           #c8bfb0;   /* text secondary */
-  --tm:           #b0a898;   /* text muted     */
-  --td:           #8a8278;   /* text dim       */
-  --tx:           #6a6460;   /* text dead      */
+  --tp:           #ede0cc;   /* text primary   */
+  --ts:           #d4c4a8;   /* text secondary */
+  --tm:           #bfad92;   /* text muted     */
+  --td:           #a09278;   /* text dim       */
+  --tx:           #8a7e68;   /* text dead      */
   --accent:       #a09080;
   --lock-stroke:  white;
   --nav-h:        64px;
@@ -34,11 +34,11 @@ body.light {
   --card:        #ede0cc;
   --border:      #d4c0a4;
   --border2:     #d8c8b0;
-  --tp:          #120800;
-  --ts:          #2a1606;
-  --tm:          #4a3018;
-  --td:          #6a5038;
-  --tx:          #8a7058;
+  --tp:          #0f0e0c;
+  --ts:          #1e1c19;
+  --tm:          #2a2720;
+  --td:          #3a3630;
+  --tx:          #4a4640;
   --accent:      #7a5830;
   --lock-stroke: #3a2010;
 }
@@ -671,21 +671,13 @@ const OBSERVANCES = {
   11:[{d:24,n:'Guru Nanak Jayanti'}],12:[{d:24,n:'Christmas Eve'}]
 };
 
-let tasks = [
-  {text:'Review lecture notes',done:false},
-  {text:'Complete problem set 4',done:false},
-  {text:'Read 30 pages',done:true}
-];
+let tasks = [];
 let blists = {
-  week:[{text:'Revise thermodynamics',dl:null},{text:'Return library books',dl:null}],
-  month:[{text:'Start DSA practice',dl:null}],
-  others:[{text:'Learn touch typing',dl:'within 3 months'},{text:'Do 10 pull-ups',dl:'within 6 months'}]
+  week:[],
+  month:[],
+  others:[]
 };
-let ddays = [
-  {name:'JEE Mains',    date:new Date(2026,3,17),def:true},
-  {name:'End Semester', date:new Date(2026,4,12),def:false},
-  {name:"Dad's B'day",  date:new Date(2026,5,8), def:false}
-];
+let ddays = [];
 
 let isLight=false, curTab='day', curBtab='week';
 let taskInputVis=false, backlogOpen=false;
