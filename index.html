@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
 <title>Daily Tracker</title>
 <link rel="manifest" href="/daily-tracker/manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
@@ -11,12 +11,29 @@
 <meta name="apple-mobile-web-app-title" content="Tracker">
 <meta name="theme-color" content="#0f0e0c">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-:root{--bg:#0f0e0c;--card:#141310;--border:#2a2720;--border2:#1e1c19;--tp:#ede0cc;--ts:#d4c4a8;--tm:#bfad92;--td:#a09278;--tx:#8a7e68;--accent:#a09080;--lock-stroke:white;}
+:root{--bg:#0f0e0c;--card:#141310;--border:#2a2720;--border2:#1e1c19;--tp:#ede0cc;--ts:#d4c4a8;--tm:#bfad92;--td:#a09278;--tx:#8a7e68;--accent:#a09080;--lock-stroke:white;--phy:#4a90e2;--zoo:#f5a623;--bot:#50c878;--che:#9b51e0;}
 body.light{--bg:#c4ad90;--card:#ede0cc;--border:#d4c0a4;--border2:#d8c8b0;--tp:#0f0e0c;--ts:#1e1c19;--tm:#2a2720;--td:#3a3630;--tx:#4a4640;--accent:#7a5830;--lock-stroke:#3a2010;}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{font-size:16px;}html,body{height:100%;overflow:hidden;}
 body{background:var(--bg);font-family:'DM Mono',monospace;}
+
+#app{width:100%;height:100%;max-width:100%;margin:0 auto;display:flex;flex-direction:column;opacity:0;transition:opacity 0.5s ease;}
+#app.visible{opacity:1;}
+
+@media (min-width: 768px) {
+  #app { max-width: 1200px; }
+  .day-layout { max-width: 800px; margin: 0 auto; }
+  .topbar { padding: 48px 32px 12px; }
+  .day-panel-inner, .year-panel-inner, .ai-panel-inner, .analysis-panel-inner { padding: 4px 32px 32px; }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .topbar { padding: 20px 24px 8px; }
+  .slider-track-area { height: 200px; }
+  .bottom-nav { padding: 4px 0 16px; }
+}
 
 #splash{position:fixed;inset:0;background:#0a0908;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
 body.light #splash{background:#d4be9e;}
@@ -41,9 +58,6 @@ body.light .sl-line-h{background:rgba(60,30,10,0.08);}
 #syncDot.syncing{background:#e8c850;}
 #syncDot.synced{background:#50d090;}
 #syncDot.error{background:#e86050;}
-
-#app{width:100%;height:100%;max-width:430px;margin:0 auto;display:flex;flex-direction:column;opacity:0;transition:opacity 0.5s ease;}
-#app.visible{opacity:1;}
 
 .topbar{display:flex;align-items:flex-start;justify-content:space-between;padding:48px 24px 12px;flex-shrink:0;background:var(--bg);position:relative;z-index:5;}
 .tb-left{}
@@ -70,6 +84,48 @@ body.light .sl-line-h{background:rgba(60,30,10,0.08);}
 .tab-panel::-webkit-scrollbar{display:none;}
 .tab-panel.active{display:block;}
 
+.analysis-panel-inner{padding:4px 24px 32px;}
+.analysis-header{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;}
+.stat-card{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:16px;flex:1;min-width:140px;}
+.stat-label{font-size:8px;letter-spacing:0.2em;color:var(--tm);text-transform:uppercase;margin-bottom:6px;}
+.stat-value{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;color:var(--tp);}
+.stat-sub{font-size:9px;color:var(--td);margin-top:4px;}
+.chart-container{background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:20px;margin-bottom:24px;}
+.chart-title{font-size:9px;letter-spacing:0.2em;color:var(--tm);text-transform:uppercase;margin-bottom:15px;}
+.chart-wrap{height:260px;width:100%;position:relative;}
+.pie-wrap{height:200px;width:100%;position:relative;}
+.legend-row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:16px 0 8px;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--ts);cursor:pointer;}
+.legend-dot{width:10px;height:10px;border-radius:50%;}
+.legend-dot.phy{background:#4a90e2;}
+.legend-dot.che{background:#9b51e0;}
+.legend-dot.bot{background:#50c878;}
+.legend-dot.zoo{background:#f5a623;}
+.test-controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px;}
+.filter-group{display:flex;gap:8px;}
+.filter-btn{background:transparent;border:1px solid var(--border2);color:var(--tm);padding:6px 12px;border-radius:20px;font-size:9px;cursor:pointer;transition:all 0.2s;}
+.filter-btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+.add-test-btn{font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--td);border:1px solid var(--border);border-radius:20px;padding:6px 12px;cursor:pointer;background:transparent;}
+.test-item{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:12px;}
+.test-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+.test-name{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--tp);cursor:pointer;}
+.test-type{font-size:8px;padding:4px 10px;border-radius:20px;color:#fff;background:#4a90e2;}
+.test-type.personal{background:#50c878;}
+.test-meta{display:flex;gap:16px;font-size:9px;color:var(--tx);margin-bottom:12px;flex-wrap:wrap;}
+.score-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;}
+.score-badge{background:var(--border2);border-radius:8px;padding:8px;text-align:center;}
+.score-subject{font-size:7px;color:var(--tm);text-transform:uppercase;}
+.score-value{font-size:13px;font-weight:bold;color:var(--ts);}
+.score-max{font-size:8px;color:var(--tx);}
+.score-percent{font-size:10px;margin-top:2px;}
+.percent-high{color:#50c878;}
+.percent-med{color:#f5a623;}
+.percent-low{color:#e86850;}
+.photo-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 0;scrollbar-width:none;}
+.photo-strip img{width:60px;height:60px;border-radius:8px;object-fit:cover;border:1px solid var(--border);cursor:pointer;}
+.test-syllabus{background:var(--border2);border-radius:8px;padding:12px;margin:12px 0;font-size:11px;color:var(--ts);display:none;}
+.test-syllabus.show{display:block;}
+.view-syllabus{font-size:8px;color:var(--accent);cursor:pointer;text-decoration:underline;}
 .day-panel-inner{padding:4px 24px 32px;}
 .day-layout{display:flex;gap:18px;}
 .day-left{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:36px;user-select:none;}
@@ -184,7 +240,6 @@ body.light .d-box.r2{background:rgba(0,0,0,0.22);border:1px solid rgba(0,0,0,0.3
 body.light .d-box.r3{background:rgba(0,0,0,0.36);border:1px solid rgba(0,0,0,0.48);}
 body.light .d-box.r4{background:rgba(0,0,0,0.52);border:1px solid rgba(0,0,0,0.64);}
 body.light .d-box.r5{background:rgba(0,0,0,0.70);border:1px solid rgba(0,0,0,0.82);}
-
 .ai-panel-inner{height:100%;display:flex;flex-direction:column;padding:16px 24px 0;}
 .ai-title{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;color:var(--tp);margin-bottom:4px;}
 .ai-sub{font-size:8px;letter-spacing:0.22em;color:var(--td);text-transform:uppercase;margin-bottom:16px;}
@@ -206,9 +261,9 @@ body.light .d-box.r5{background:rgba(0,0,0,0.70);border:1px solid rgba(0,0,0,0.8
 .nav-item.active .nav-icon{color:var(--ts);}
 .nav-item.active .nav-label{color:var(--ts);}
 
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:500;display:none;align-items:center;justify-content:center;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
 .overlay.open{display:flex;}
-.dialog{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px 20px;width:290px;max-height:74vh;overflow-y:auto;}
+.dialog{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px 20px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto;}
 .dlg-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;color:var(--tp);margin-bottom:2px;}
 .dlg-sub{font-size:9px;letter-spacing:0.2em;color:var(--td);text-transform:uppercase;margin-bottom:16px;}
 .hol-sl{font-size:8px;letter-spacing:0.22em;color:var(--td);text-transform:uppercase;margin:10px 0 6px;}
@@ -218,7 +273,6 @@ body.light .d-box.r5{background:rgba(0,0,0,0.70);border:1px solid rgba(0,0,0,0.8
 .hol-n{font-family:'Cormorant Garamond',serif;font-size:13px;font-weight:300;color:var(--ts);}
 .dlg-close{margin-top:16px;width:100%;padding:9px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--td);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;}
 
-/* DATE PICKER */
 .dp-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .dp-month-label{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:300;color:var(--tp);}
 .dp-nav-btn{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--tm);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
@@ -231,11 +285,18 @@ body.light .d-box.r5{background:rgba(0,0,0,0.70);border:1px solid rgba(0,0,0,0.8
 .dp-day.is-rated::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:var(--tm);}
 .dp-day.empty{cursor:default;pointer-events:none;}
 
-/* YEAR PICKER */
 .year-picker-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0;}
 .yp-item{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:300;color:var(--ts);text-align:center;padding:10px 4px;border-radius:8px;cursor:pointer;border:1px solid transparent;transition:all 0.15s;}
 .yp-item:active{border-color:var(--border);}
 .yp-item.is-current{border-color:var(--border);color:var(--tp);}
+
+.score-input-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.score-input-group{display:flex;flex-direction:column;}
+.score-input-group label{font-size:7px;letter-spacing:0.1em;color:var(--tm);text-transform:uppercase;margin-bottom:2px;}
+.score-input{background:transparent;border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--ts);font-size:11px;font-family:'DM Mono',monospace;}
+.radio-group{display:flex;gap:16px;margin:12px 0;}
+.radio-label{display:flex;align-items:center;gap:6px;color:var(--ts);font-size:11px;cursor:pointer;}
+textarea.score-input{min-height:60px;resize:vertical;}
 </style>
 </head>
 <body>
@@ -340,7 +401,7 @@ body.light .d-box.r5{background:rgba(0,0,0,0.70);border:1px solid rgba(0,0,0,0.8
                 </div>
               </div>
             </div>
-            <div style="margin-top:8px">
+                        <div style="margin-top:8px">
               <div class="row-header" style="margin-bottom:0;padding-top:20px;border-top:1px solid var(--border2)">
                 <div class="row-label">countdowns</div>
                 <button class="pill-btn" onclick="toggleDdayAdd()">+ new</button>
@@ -385,6 +446,69 @@ body.light .d-box.r5{background:rgba(0,0,0,0.70);border:1px solid rgba(0,0,0,0.8
         </div>
       </div>
     </div>
+
+    <div class="tab-panel" id="panel-analysis">
+      <div class="analysis-panel-inner">
+        <div class="analysis-header">
+          <div class="stat-card">
+            <div class="stat-label">Total Tests</div>
+            <div class="stat-value" id="totalTests">0</div>
+            <div class="stat-sub">all time</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg. Score</div>
+            <div class="stat-value" id="avgScore">0%</div>
+            <div class="stat-sub">overall</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Best Subject</div>
+            <div class="stat-value" id="bestSubject">—</div>
+            <div class="stat-sub">by percentage</div>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">Performance Over Time</div>
+          <div class="chart-wrap">
+            <canvas id="perfChart"></canvas>
+          </div>
+          <div class="legend-row" id="chartLegend"></div>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">Subject Distribution</div>
+          <div class="pie-wrap">
+            <canvas id="pieChart"></canvas>
+          </div>
+          <div class="legend-row">
+            <div class="legend-item" onclick="toggleSubject('phy')">
+              <span class="legend-dot phy"></span> Physics
+            </div>
+            <div class="legend-item" onclick="toggleSubject('che')">
+              <span class="legend-dot che"></span> Chemistry
+            </div>
+            <div class="legend-item" onclick="toggleSubject('bot')">
+              <span class="legend-dot bot"></span> Botany
+            </div>
+            <div class="legend-item" onclick="toggleSubject('zoo')">
+              <span class="legend-dot zoo"></span> Zoology
+            </div>
+          </div>
+        </div>
+
+        <div class="test-controls">
+          <span style="font-size:9px;letter-spacing:0.2em;color:var(--tm)">Test History</span>
+          <div class="filter-group">
+            <button class="filter-btn active" onclick="filterTests('all')">All</button>
+            <button class="filter-btn" onclick="filterTests('institutional')">Inst.</button>
+            <button class="filter-btn" onclick="filterTests('personal')">Pers.</button>
+          </div>
+          <button class="add-test-btn" onclick="openTestEntry()">+ New Test</button>
+        </div>
+
+        <div id="testHistory"></div>
+      </div>
+    </div>
   </div>
 
   <div class="bottom-nav">
@@ -397,10 +521,81 @@ body.light .d-box.r5{background:rgba(0,0,0,0.70);border:1px solid rgba(0,0,0,0.8
     <div class="nav-item" id="nav-claude" onclick="switchTab('claude')">
       <div class="nav-icon">✦</div><div class="nav-label">Claude</div>
     </div>
+    <div class="nav-item" id="nav-analysis" onclick="switchTab('analysis')">
+      <div class="nav-icon">📊</div><div class="nav-label">Analysis</div>
+    </div>
   </div>
 </div>
 
-<!-- OVERLAYS -->
+<div class="overlay" id="testOverlay" onclick="closeOverlayBg(event,'testOverlay')">
+  <div class="dialog">
+    <div class="dlg-title">Log Test</div>
+    <div class="dlg-sub">enter your scores</div>
+    
+    <input class="score-input" id="testName" placeholder="Test name (e.g. Mock-01)" style="margin-bottom:12px;">
+    <input class="score-input" type="date" id="testDate" style="margin-bottom:12px;">
+    
+    <div class="radio-group">
+      <label class="radio-label"><input type="radio" name="testType" value="institutional" checked> Institutional</label>
+      <label class="radio-label"><input type="radio" name="testType" value="personal"> Personal</label>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div style="font-size:8px;color:var(--tm);margin-bottom:6px;">Physics</div>
+      <div class="score-input-row">
+        <input class="score-input" id="phyAttained" placeholder="Attained" value="0">
+        <input class="score-input" id="phyMax" placeholder="Max" value="180">
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div style="font-size:8px;color:var(--tm);margin-bottom:6px;">Chemistry</div>
+      <div class="score-input-row">
+        <input class="score-input" id="cheAttained" placeholder="Attained" value="0">
+        <input class="score-input" id="cheMax" placeholder="Max" value="180">
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div style="font-size:8px;color:var(--tm);margin-bottom:6px;">Botany</div>
+      <div class="score-input-row">
+        <input class="score-input" id="botAttained" placeholder="Attained" value="0">
+        <input class="score-input" id="botMax" placeholder="Max" value="360">
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div style="font-size:8px;color:var(--tm);margin-bottom:6px;">Zoology</div>
+      <div class="score-input-row">
+        <input class="score-input" id="zooAttained" placeholder="Attained" value="0">
+        <input class="score-input" id="zooMax" placeholder="Max" value="360">
+      </div>
+    </div>
+
+    <textarea class="score-input" id="testSyllabus" placeholder="Syllabus covered..."></textarea>
+    
+    <div class="photo-strip" id="uploadStrip" style="margin:12px 0;">
+      <button class="add-btn" onclick="document.getElementById('fileInput').click()" style="width:40px;">+</button>
+    </div>
+    <input type="file" id="fileInput" multiple accept="image/*" style="display:none;" onchange="handleFiles(this.files)">
+    
+    <button class="dlg-close" onclick="saveTest()" style="border-color:var(--accent);color:var(--tp);margin-top:8px;">Save Test</button>
+    <button class="dlg-close" onclick="closeOverlay('testOverlay')">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="syllabusOverlay" onclick="closeOverlayBg(event,'syllabusOverlay')">
+  <div class="dialog">
+    <div class="dlg-title" id="syllabusTestName"></div>
+    <div id="syllabusContent" style="color:var(--ts);font-size:12px;line-height:1.6;margin:16px 0;"></div>
+    <button class="dlg-close" onclick="closeOverlay('syllabusOverlay')">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="imageOverlay" onclick="closeOverlay('imageOverlay')">
+  <img id="fullImage" style="max-width:90%;max-height:90%;object-fit:contain;">
+</div>
+
 <div class="overlay" id="holOverlay" onclick="closeOverlayBg(event,'holOverlay')">
   <div class="dialog">
     <div class="dlg-title" id="holMonth"></div>
@@ -432,9 +627,9 @@ body.light .d-box.r5{background:rgba(0,0,0,0.70);border:1px solid rgba(0,0,0,0.8
 </div>
 
 <script type="module">
-import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs }
-  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, query, orderBy, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 const FB = initializeApp({
   apiKey:"AIzaSyAi6R3Pujpy9O_hH9wgIdTtCsmhebxP2JE",
@@ -445,47 +640,46 @@ const FB = initializeApp({
   appId:"1:794517135809:web:1b77e7dd78f4359ce18f40"
 });
 const DB = getFirestore(FB);
+const STORAGE = getStorage(FB);
 
-// ── CONSTANTS ───────────────────────────────────────────────
 const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const GAZETTE = {1:[{d:26,n:'Republic Day'}],3:[{d:25,n:'Holi'}],4:[{d:2,n:'Ram Navami'},{d:14,n:'Dr. Ambedkar Jayanti'}],5:[{d:1,n:'Labour Day'},{d:12,n:'Buddha Purnima'}],8:[{d:15,n:'Independence Day'},{d:27,n:'Janmashtami'}],10:[{d:2,n:'Gandhi Jayanti'},{d:20,n:'Dussehra'}],11:[{d:1,n:'Diwali'},{d:5,n:'Bhai Dooj'}],12:[{d:25,n:'Christmas'}]};
 const OBSERVANCES = {1:[{d:14,n:'Makar Sankranti / Pongal'},{d:29,n:'Basant Panchami'}],2:[{d:26,n:'Maha Shivratri'}],3:[{d:1,n:'Ramzan begins'},{d:30,n:'Eid ul-Fitr (approx)'}],4:[{d:9,n:'Ugadi / Gudi Padwa'},{d:13,n:'Baisakhi'}],5:[{d:23,n:'Eid ul-Adha (approx)'}],8:[{d:9,n:'Raksha Bandhan'},{d:19,n:'Ganesh Chaturthi'}],9:[{d:22,n:'Navratri begins'}],10:[{d:12,n:'Karva Chauth'},{d:29,n:'Chhath Puja'}],11:[{d:24,n:'Guru Nanak Jayanti'}],12:[{d:24,n:'Christmas Eve'}]};
 
-// ── STATE ───────────────────────────────────────────────────
 const TODAY = new Date(); TODAY.setHours(0,0,0,0);
 let viewDate  = new Date(TODAY);
 let gridYear  = TODAY.getFullYear();
-let dayCache  = {};          // dateKey -> {tasks,rating}
+let dayCache  = {};
 let shared    = { ddays:[], blists:{week:[],month:[],others:[]} };
 let isLight   = false, curTab = 'day', curBtab = 'week';
 let taskInputVis=false, backlogOpen=false, bInputVis=false, bChipSel=null;
 let ddayAddVis=false, makeDefDday=false;
 let dpM = TODAY.getMonth(), dpY = TODAY.getFullYear();
 
-// ── SYNC DOT ────────────────────────────────────────────────
+let tests = [];
+let hiddenSubjects = new Set();
+let uploadedImages = [];
 function sync(s){ const el=document.getElementById('syncDot'); el.className=s; if(s==='synced') setTimeout(()=>el.className='',2500); }
 
-// ── DATE UTILS ──────────────────────────────────────────────
 function dk(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
 
-// ── FIREBASE ────────────────────────────────────────────────
 async function saveDay(key,data){ sync('syncing'); try{ await setDoc(doc(DB,'days',key),data); sync('synced'); }catch(e){ sync('error'); } }
 async function loadDay(key){ try{ const s=await getDoc(doc(DB,'days',key)); return s.exists()?s.data():null; }catch(e){ return null; } }
 async function saveShared(){ sync('syncing'); try{ await setDoc(doc(DB,'shared','main'),shared); sync('synced'); }catch(e){ sync('error'); } }
 async function loadShared(){ try{ const s=await getDoc(doc(DB,'shared','main')); if(s.exists()) shared=s.data(); }catch(e){} }
 
-// Live sync — backlog + ddays update instantly across devices
-onSnapshot(doc(DB,'shared','main'), snap => {
-  if(snap.exists()){ shared=snap.data(); renderDdays(); renderBlists(); updateDdayBadge(); }
-});
-// Live sync — day data
-onSnapshot(doc(DB,'days',dk(viewDate)), snap => {
-  if(snap.exists()){ const key=dk(viewDate); dayCache[key]=snap.data(); renderDayView(); }
+onSnapshot(doc(DB,'shared','main'), snap => { if(snap.exists()){ shared=snap.data(); renderDdays(); renderBlists(); updateDdayBadge(); } });
+onSnapshot(doc(DB,'days',dk(viewDate)), snap => { if(snap.exists()){ const key=dk(viewDate); dayCache[key]=snap.data(); renderDayView(); } });
+onSnapshot(query(collection(DB, "tests"), orderBy("date", "desc")), (snap) => {
+  tests = [];
+  snap.forEach(d => tests.push({ id: d.id, ...d.data() }));
+  renderTests();
+  updateCharts();
+  updateStats();
 });
 
-// ── BOOT ────────────────────────────────────────────────────
 window.addEventListener('load', async ()=>{
   const cached = sessionStorage.getItem('dt_loaded');
   if(cached){ document.getElementById('splash').style.display='none'; document.getElementById('app').classList.add('visible'); }
@@ -494,6 +688,7 @@ window.addEventListener('load', async ()=>{
   await gotoDate(viewDate, true);
   updateClock(); setInterval(updateClock,1000);
   renderDdays(); renderBlists(); updateDdayBadge(); renderSlider();
+  initCharts();
   bindEvents();
 });
 
@@ -506,7 +701,6 @@ function bindEvents(){
   document.getElementById('ddayBadge').onclick = ()=>{ if(curTab!=='day') switchTab('day'); setTimeout(()=>document.getElementById('ddayList').scrollIntoView({behavior:'smooth'}),100); };
 }
 
-// ── GOTO DATE ───────────────────────────────────────────────
 async function gotoDate(date, force=false){
   viewDate = new Date(date); viewDate.setHours(0,0,0,0);
   const key = dk(viewDate);
@@ -543,7 +737,6 @@ function updateTopBar(){
   } else bar.classList.remove('show');
 }
 
-// ── CLOCK ───────────────────────────────────────────────────
 function updateClock(){
   const ist=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
   let h=ist.getHours(),m=ist.getMinutes(),s=ist.getSeconds();
@@ -552,11 +745,9 @@ function updateClock(){
 }
 window.updateClock=updateClock;
 
-// ── NAV ARROWS ──────────────────────────────────────────────
 window.shiftDay = async function(d){ const nd=new Date(viewDate); nd.setDate(nd.getDate()+d); await gotoDate(nd); };
 window.goToToday = async function(){ await gotoDate(new Date(TODAY)); };
 
-// ── TABS ────────────────────────────────────────────────────
 window.switchTab = function(tab){
   curTab=tab;
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
@@ -565,12 +756,11 @@ window.switchTab = function(tab){
   document.getElementById(`nav-${tab}`).classList.add('active');
   if(tab==='year') buildGrid();
   if(tab==='claude') setTimeout(()=>document.getElementById('aiInput').focus(),100);
+  if(tab==='analysis') { setTimeout(() => { if(perfChart) perfChart.update(); if(pieChart) pieChart.update(); }, 150); }
 };
 
-// ── THEME ───────────────────────────────────────────────────
 window.toggleTheme = function(){ isLight=!isLight; document.body.classList.toggle('light',isLight); renderSlider(); };
 
-// ── TASKS ───────────────────────────────────────────────────
 function renderTasks(){
   const tasks=(dayCache[dk(viewDate)]||{tasks:[]}).tasks||[];
   const list=document.getElementById('taskList'); list.innerHTML='';
@@ -600,7 +790,6 @@ window.toggleTaskInput = function(){
   if(taskInputVis) inp.focus(); else inp.value='';
 };
 
-// ── BACKLOG ─────────────────────────────────────────────────
 window.toggleBacklog=function(){ backlogOpen=!backlogOpen; document.getElementById('backlogSheet').classList.toggle('open',backlogOpen); };
 
 window.renderBlists=function(){
@@ -619,7 +808,6 @@ window.toggleBInput=function(){ bInputVis=!bInputVis; document.getElementById('b
 window.selChip=function(el,val){ document.querySelectorAll('.d-chip').forEach(c=>c.classList.remove('sel')); bChipSel=bChipSel===val?null:val; if(bChipSel) el.classList.add('sel'); };
 window.addBitem=async function(){ const text=document.getElementById('bNameInp').value.trim(); if(!text) return; if(!shared.blists) shared.blists={week:[],month:[],others:[]}; shared.blists[curBtab].unshift({text,dl:curBtab==='others'?bChipSel:null}); renderBlists(); document.getElementById('bNameInp').value='';bChipSel=null;document.querySelectorAll('.d-chip').forEach(c=>c.classList.remove('sel'));document.getElementById('bNameInp').focus(); await saveShared(); };
 
-// ── D-DAYS ──────────────────────────────────────────────────
 function daysUntil(ds){ const d=new Date(ds);d.setHours(0,0,0,0);return Math.round((d-TODAY)/864e5); }
 function fmtD(ds){ const d=new Date(ds),M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`; }
 
@@ -653,13 +841,11 @@ window.addDday=async function(){
   renderDdays(); await saveShared(); toggleDdayAdd();
 };
 
-// ── YEAR GRID ───────────────────────────────────────────────
 async function buildGrid(){
   const yr=gridYear,grid=document.getElementById('yearGrid');
   grid.innerHTML='';
   document.getElementById('yearLabel').textContent=yr+' ▾';
 
-  // Load all rated days for this year
   let rated={};
   try{
     const snap=await getDocs(collection(DB,'days'));
@@ -694,7 +880,6 @@ window.buildGrid=buildGrid;
 
 async function jumpTo(yr,m,d){ await gotoDate(new Date(yr,m-1,d)); switchTab('day'); }
 
-// ── HOLIDAYS ────────────────────────────────────────────────
 window.openHol=function(m,yr){
   yr=yr||gridYear;
   const gaz=GAZETTE[m]||[],obs=OBSERVANCES[m]||[],DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -707,8 +892,6 @@ window.openHol=function(m,yr){
   document.getElementById('holContent').innerHTML=html;
   openOverlay('holOverlay');
 };
-
-// ── DATE PICKER ─────────────────────────────────────────────
 window.openDatePicker=function(){ dpM=viewDate.getMonth();dpY=viewDate.getFullYear();renderDp();openOverlay('dpOverlay'); };
 window.dpShift=function(d){ dpM+=d; if(dpM>11){dpM=0;dpY++;} if(dpM<0){dpM=11;dpY--;} renderDp(); };
 function renderDp(){
@@ -729,7 +912,6 @@ function renderDp(){
 }
 window.dpPick=async function(d){ await gotoDate(new Date(dpY,dpM,d)); closeOverlay('dpOverlay'); switchTab('day'); };
 
-// ── YEAR PICKER ─────────────────────────────────────────────
 window.openYearPicker=function(){
   const yr=gridYear,grid=document.getElementById('ypGrid');grid.innerHTML='';
   for(let y=yr-4;y<=yr+4;y++){
@@ -740,12 +922,10 @@ window.openYearPicker=function(){
   openOverlay('ypOverlay');
 };
 
-// ── OVERLAYS ────────────────────────────────────────────────
 window.openOverlay=function(id){ document.getElementById(id).classList.add('open'); };
 window.closeOverlay=function(id){ document.getElementById(id).classList.remove('open'); };
 window.closeOverlayBg=function(e,id){ if(e.target===document.getElementById(id)) closeOverlay(id); };
 
-// ── CLAUDE ──────────────────────────────────────────────────
 window.sendAI=async function(){
   const inp=document.getElementById('aiInput'),text=inp.value.trim();if(!text)return;inp.value='';
   addMsg('user',text);addMsg('thinking','thinking...');
@@ -757,7 +937,6 @@ window.sendAI=async function(){
 function addMsg(role,text){const msgs=document.getElementById('aiMessages'),div=document.createElement('div');div.className=`ai-msg ${role}`;div.textContent=text;msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;}
 function rmThink(){const t=document.getElementById('aiMessages').querySelector('.thinking');if(t)t.remove();}
 
-// ── SLIDER ──────────────────────────────────────────────────
 const DARK_C=[[232,138,80],[232,196,80],[188,210,72],[80,210,148],[80,210,188]];
 const LIGHT_C=[[195,175,150],[160,135,108],[120,95,70],[80,58,38],[42,26,12]];
 function DC(){return isLight?LIGHT_C:DARK_C;}
@@ -846,6 +1025,235 @@ window.addEventListener('touchmove',e=>{if(!sDrag||sLocked)return;setHover(getV(
 window.addEventListener('mouseup',()=>{if(!sDrag)return;sDrag=false;if(!sLocked&&sHover>0){const v=sHover;clearHover();confirmRating(v);}});
 window.addEventListener('touchend',()=>{if(!sDrag)return;sDrag=false;if(!sLocked&&sHover>0){const v=sHover;clearHover();confirmRating(v);}});
 window.addEventListener('resize',()=>{resizeCanvas();renderSlider();});
+
+let perfChart, pieChart;
+
+function initCharts() {
+  const perfCtx = document.getElementById('perfChart').getContext('2d');
+  perfChart = new Chart(perfCtx, {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 100, grid: { color: '#1e1c19' }, ticks: { color: '#8a7e68', font: { size: 9 }, callback: v => v + '%' } },
+        x: { grid: { display: false }, ticks: { color: '#8a7e68', font: { size: 9 }, maxRotation: 45, minRotation: 45 } }
+      },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw}%` } } }
+    }
+  });
+
+  const pieCtx = document.getElementById('pieChart').getContext('2d');
+  pieChart = new Chart(pieCtx, {
+    type: 'pie',
+    data: {
+      labels: ['Physics', 'Chemistry', 'Botany', 'Zoology'],
+      datasets: [{
+        data: [0, 0, 0, 0],
+        backgroundColor: ['#4a90e2', '#9b51e0', '#50c878', '#f5a623'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}%` } } }
+    }
+  });
+}
+
+window.openTestEntry = () => {
+  document.getElementById('testDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('testOverlay').classList.add('open');
+  uploadedImages = [];
+};
+
+window.handleFiles = async (files) => {
+  const strip = document.getElementById('uploadStrip');
+  for (let file of files) {
+    try {
+      const ref = ref(STORAGE, `tests/${Date.now()}_${file.name}`);
+      const snap = await uploadBytes(ref, file);
+      const url = await getDownloadURL(snap.ref);
+      uploadedImages.push(url);
+      const img = document.createElement('img');
+      img.src = url;
+      img.className = 'img-thumb';
+      img.onclick = () => viewImage(url);
+      strip.appendChild(img);
+    } catch (e) { console.error('Upload failed'); }
+  }
+};
+
+window.saveTest = async () => {
+  const name = document.getElementById('testName').value;
+  const date = document.getElementById('testDate').value;
+  const type = document.querySelector('input[name="testType"]:checked').value;
+  if (!name || !date) { alert('Fill name and date'); return; }
+  
+  const scores = {
+    phy: { attained: parseInt(document.getElementById('phyAttained').value) || 0, max: parseInt(document.getElementById('phyMax').value) || 180 },
+    che: { attained: parseInt(document.getElementById('cheAttained').value) || 0, max: parseInt(document.getElementById('cheMax').value) || 180 },
+    bot: { attained: parseInt(document.getElementById('botAttained').value) || 0, max: parseInt(document.getElementById('botMax').value) || 360 },
+    zoo: { attained: parseInt(document.getElementById('zooAttained').value) || 0, max: parseInt(document.getElementById('zooMax').value) || 360 }
+  };
+  
+  const percentages = {};
+  let totalPct = 0, count = 0;
+  for (let [sub, data] of Object.entries(scores)) {
+    if (data.max > 0) {
+      percentages[sub] = (data.attained / data.max) * 100;
+      totalPct += percentages[sub];
+      count++;
+    }
+  }
+  
+  const testData = {
+    name, date, type, scores, percentages,
+    overall: count > 0 ? totalPct / count : 0,
+    syllabus: document.getElementById('testSyllabus').value,
+    images: uploadedImages,
+    timestamp: Date.now()
+  };
+  
+  await setDoc(doc(DB, 'tests', `${date}_${name}`), testData);
+  closeOverlay('testOverlay');
+  
+  document.getElementById('testName').value = '';
+  document.getElementById('testSyllabus').value = '';
+  document.getElementById('uploadStrip').innerHTML = '<button class="add-btn" onclick="document.getElementById(\'fileInput\').click()" style="width:40px;">+</button>';
+  ['phy','che','bot','zoo'].forEach(s => {
+    document.getElementById(`${s}Attained`).value = '0';
+  });
+};
+
+window.filterTests = (filter) => {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderTests(filter);
+};
+
+window.viewSyllabus = (name, syllabus) => {
+  document.getElementById('syllabusTestName').textContent = name;
+  document.getElementById('syllabusContent').textContent = syllabus || 'No syllabus provided';
+  openOverlay('syllabusOverlay');
+};
+
+window.viewImage = (url) => {
+  document.getElementById('fullImage').src = url;
+  openOverlay('imageOverlay');
+};
+
+window.deleteTest = async (id) => {
+  if (confirm('Delete this test?')) {
+    await deleteDoc(doc(DB, 'tests', id));
+    // Force immediate update of UI
+    setTimeout(() => {
+      renderTests();
+      updateCharts();
+      updateStats();
+    }, 100);
+  }
+};
+
+function renderTests(filter = 'all') {
+  const container = document.getElementById('testHistory');
+  let filtered = tests;
+  if (filter !== 'all') filtered = tests.filter(t => t.type === filter);
+  
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--tm)">No tests logged yet</div>';
+    return;
+  }
+  
+  container.innerHTML = filtered.map(t => {
+    const totalAtt = Object.values(t.scores).reduce((s, d) => s + d.attained, 0);
+    const totalMax = Object.values(t.scores).reduce((s, d) => s + d.max, 0);
+    const overall = totalMax > 0 ? ((totalAtt / totalMax) * 100).toFixed(1) : 0;
+    
+    return `
+      <div class="test-item">
+        <div class="test-header">
+          <span class="test-name" onclick="viewSyllabus('${t.name.replace(/'/g, "\\'")}', '${(t.syllabus || '').replace(/'/g, "\\'").replace(/\n/g, ' ')}')">${t.name}</span>
+          <span class="test-type ${t.type}">${t.type}</span>
+        </div>
+        <div class="test-meta">
+          <span>📅 ${t.date}</span>
+          <span>📊 ${overall}%</span>
+        </div>
+        <div class="score-grid">
+          ${Object.entries(t.scores).map(([sub, data]) => {
+            const pct = data.max > 0 ? ((data.attained / data.max) * 100).toFixed(1) : 0;
+            const pctClass = pct >= 75 ? 'percent-high' : (pct >= 50 ? 'percent-med' : 'percent-low');
+            return `
+              <div class="score-badge">
+                <div class="score-subject">${sub.toUpperCase()}</div>
+                <div class="score-value">${data.attained}</div>
+                <div class="score-max">/${data.max}</div>
+                <div class="score-percent ${pctClass}">${pct}%</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        ${t.images && t.images.length ? `
+          <div class="photo-strip">
+            ${t.images.map(img => `<img src="${img}" onclick="viewImage('${img}')">`).join('')}
+          </div>
+        ` : ''}
+        <div style="margin-top:12px; display:flex; gap:8px;">
+          <span class="view-syllabus" onclick="viewSyllabus('${t.name.replace(/'/g, "\\'")}', '${(t.syllabus || '').replace(/'/g, "\\'").replace(/\n/g, ' ')}')">View syllabus</span>
+          <span class="view-syllabus" onclick="deleteTest('${t.id}')" style="color:#e86850;">Delete</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateCharts() {
+  if (!perfChart || !pieChart || !tests.length) return;
+  
+  const sorted = [...tests].sort((a, b) => a.date.localeCompare(b.date));
+  perfChart.data.labels = sorted.map(t => t.name);
+  
+  const datasets = ['phy', 'che', 'bot', 'zoo']
+    .filter(s => !hiddenSubjects.has(s))
+    .map(s => ({
+      label: s.toUpperCase(),
+      data: sorted.map(t => t.percentages[s]?.toFixed(1) || 0),
+      borderColor: s === 'phy' ? '#4a90e2' : s === 'che' ? '#9b51e0' : s === 'bot' ? '#50c878' : '#f5a623',
+      tension: 0.3,
+      pointRadius: 4
+    }));
+  
+  perfChart.data.datasets = datasets;
+  perfChart.update();
+  
+  const avgs = {
+    phy: tests.reduce((s, t) => s + (t.percentages.phy || 0), 0) / tests.length,
+    che: tests.reduce((s, t) => s + (t.percentages.che || 0), 0) / tests.length,
+    bot: tests.reduce((s, t) => s + (t.percentages.bot || 0), 0) / tests.length,
+    zoo: tests.reduce((s, t) => s + (t.percentages.zoo || 0), 0) / tests.length
+  };
+  pieChart.data.datasets[0].data = [avgs.phy, avgs.che, avgs.bot, avgs.zoo];
+  pieChart.update();
+}
+
+function updateStats() {
+  if (!tests.length) return;
+  document.getElementById('totalTests').textContent = tests.length;
+  
+  const avg = tests.reduce((s, t) => s + t.overall, 0) / tests.length;
+  document.getElementById('avgScore').textContent = avg.toFixed(1) + '%';
+  
+  const subAvgs = {
+    phy: tests.reduce((s, t) => s + (t.percentages.phy || 0), 0) / tests.length,
+    che: tests.reduce((s, t) => s + (t.percentages.che || 0), 0) / tests.length,
+    bot: tests.reduce((s, t) => s + (t.percentages.bot || 0), 0) / tests.length,
+    zoo: tests.reduce((s, t) => s + (t.percentages.zoo || 0), 0) / tests.length
+  };
+  const best = Object.entries(subAvgs).reduce((a, b) => a[1] > b[1] ? a : b);
+  const names = { phy: 'Physics', che: 'Chemistry', bot: 'Botany', zoo: 'Zoology' };
+  document.getElementById('bestSubject').textContent = names[best[0]];
+}
 </script>
 
 <script>
