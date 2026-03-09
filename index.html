@@ -354,6 +354,32 @@ textarea.score-input{min-height:60px;resize:vertical;}
 #ocr-file-inp{display:none;}
 
 #settings-panel.open{display:flex;}
+
+/* ── Task actions ── */
+.task-item{position:relative;}
+.task-actions{display:none;align-items:center;gap:2px;margin-left:auto;flex-shrink:0;}
+.task-item.act-open .task-actions{display:flex;}
+.task-item.act-open .t-text{opacity:0.5;}
+.ta-btn{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;line-height:1;color:var(--td);transition:border-color 0.15s,color 0.15s;}
+.ta-btn:active{border-color:var(--accent);}
+.ta-del{color:#b05050;}
+.ta-del:active{border-color:#b05050;}
+/* inline edit row */
+.task-edit-row{display:none;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);}
+.task-edit-row.vis{display:flex;}
+.task-edit-inp{flex:1;background:transparent;border:none;border-bottom:1px solid var(--tm);outline:none;font-family:'DM Mono',monospace;font-size:11px;color:var(--ts);padding:2px 0;letter-spacing:0.04em;}
+.task-edit-save{font-size:7px;letter-spacing:0.14em;text-transform:uppercase;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--td);padding:5px 10px;cursor:pointer;font-family:'DM Mono',monospace;white-space:nowrap;}
+/* forward modal */
+#fwd-modal{position:fixed;inset:0;z-index:900;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.55);}
+#fwd-modal.open{display:flex;}
+#fwd-inner{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:22px 20px 40px;display:flex;flex-direction:column;gap:12px;}
+#fwd-title{font-size:8px;letter-spacing:0.26em;text-transform:uppercase;color:var(--td);}
+#fwd-preview{font-size:11px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0.75;margin-bottom:4px;}
+.fwd-opt{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color 0.18s;}
+.fwd-opt:active{border-color:var(--accent);}
+.fwd-opt-label{font-size:10px;color:var(--ts);letter-spacing:0.06em;}
+.fwd-opt-date{font-size:8px;color:var(--td);letter-spacing:0.08em;font-family:'DM Mono',monospace;}
+#fwd-cancel{align-self:center;margin-top:4px;font-size:7px;letter-spacing:0.2em;text-transform:uppercase;color:var(--td);background:transparent;border:1px solid var(--border);border-radius:20px;padding:8px 22px;cursor:pointer;font-family:'DM Mono',monospace;}
 </style>
 <script>(function(){var m=localStorage.getItem("dt_theme_mode"),t=localStorage.getItem("dt_theme_name")||"original";document.documentElement.setAttribute("data-theme",t);document.documentElement.setAttribute("data-mode",m||"dark");if(m==="light")document.addEventListener("DOMContentLoaded",function(){document.body.classList.add("light");});})();</script>
 </head>
@@ -885,10 +911,29 @@ function renderTasks(){
   const tasks=(dayCache[dk(viewDate)]||{tasks:[]}).tasks||[];
   const list=document.getElementById('taskList'); list.innerHTML='';
   [...tasks.filter(t=>!t.done),...tasks.filter(t=>t.done)].forEach(t=>{
-    const i=tasks.indexOf(t), div=document.createElement('div');
+    const i=tasks.indexOf(t);
+    // wrapper: task row + inline edit row
+    const wrap=document.createElement('div');
+
+    const div=document.createElement('div');
     div.className=`task-item${t.done?' done':''}`;
-    div.innerHTML=`<div class="t-check" onclick="toggleTask(${i})"><svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3l2 2 4-4" stroke="var(--tm)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="t-text">${t.text}</span>`;
-    list.appendChild(div);
+    div.innerHTML=`
+      <div class="t-check" onclick="toggleTask(${i})"><svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3l2 2 4-4" stroke="var(--tm)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <span class="t-text" onclick="toggleTaskAct(this)">${t.text}</span>
+      <div class="task-actions">
+        <button class="ta-btn" title="edit" onclick="startEditTask(${i})">✎</button>
+        <button class="ta-btn" title="forward" onclick="openFwdModal(${i})">→</button>
+        <button class="ta-btn ta-del" title="delete" onclick="deleteTask(${i})">✕</button>
+      </div>`;
+
+    const editRow=document.createElement('div');
+    editRow.className='task-edit-row';
+    editRow.id=`edit-row-${i}`;
+    editRow.innerHTML=`<input class="task-edit-inp" id="edit-inp-${i}" value="${t.text.replace(/"/g,'&quot;')}" /><button class="task-edit-save" onclick="saveEditTask(${i})">save</button>`;
+
+    wrap.appendChild(div);
+    wrap.appendChild(editRow);
+    list.appendChild(wrap);
   });
 }
 window.renderTasks=renderTasks;
@@ -901,6 +946,83 @@ async function addTask(text){
 window.toggleTask = async function(i){
   const key=dk(viewDate); if(!dayCache[key]) return;
   dayCache[key].tasks[i].done=!dayCache[key].tasks[i].done; renderTasks(); await saveDay(key,dayCache[key]);
+};
+
+window.toggleTaskAct = function(el){
+  const item = el.closest('.task-item');
+  const wasOpen = item.classList.contains('act-open');
+  // close all others
+  document.querySelectorAll('.task-item.act-open').forEach(x=>x.classList.remove('act-open'));
+  if(!wasOpen) item.classList.add('act-open');
+};
+
+window.deleteTask = async function(i){
+  const key=dk(viewDate); if(!dayCache[key]) return;
+  dayCache[key].tasks.splice(i,1); renderTasks(); await saveDay(key,dayCache[key]);
+};
+
+window.startEditTask = function(i){
+  // close action buttons, show edit row
+  document.querySelectorAll('.task-item.act-open').forEach(x=>x.classList.remove('act-open'));
+  const row=document.getElementById(`edit-row-${i}`);
+  row.classList.add('vis');
+  const inp=document.getElementById(`edit-inp-${i}`);
+  inp.focus(); inp.select();
+  inp.onkeydown=e=>{ if(e.key==='Enter') saveEditTask(i); if(e.key==='Escape') row.classList.remove('vis'); };
+};
+
+window.saveEditTask = async function(i){
+  const key=dk(viewDate); if(!dayCache[key]) return;
+  const val=document.getElementById(`edit-inp-${i}`).value.trim();
+  if(val) dayCache[key].tasks[i].text=val;
+  renderTasks(); await saveDay(key,dayCache[key]);
+};
+
+// ── Forward task ──
+let _fwdIdx=null;
+window.openFwdModal = function(i){
+  document.querySelectorAll('.task-item.act-open').forEach(x=>x.classList.remove('act-open'));
+  _fwdIdx=i;
+  const tasks=(dayCache[dk(viewDate)]||{tasks:[]}).tasks||[];
+  document.getElementById('fwd-preview').textContent=tasks[i]?.text||'';
+  // build date options: tomorrow, +2 days, +3 days, next week
+  const opts=document.getElementById('fwd-opts');
+  opts.innerHTML='';
+  const labels=['tomorrow','+2 days','+3 days','next week'];
+  const offsets=[1,2,3,7];
+  offsets.forEach((off,j)=>{
+    const d=new Date(viewDate); d.setDate(d.getDate()+off);
+    const label=labels[j];
+    const dateStr=d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+    const btn=document.createElement('div');
+    btn.className='fwd-opt';
+    btn.innerHTML=`<span class="fwd-opt-label">${label}</span><span class="fwd-opt-date">${dateStr}</span>`;
+    btn.onclick=()=>fwdTask(off);
+    opts.appendChild(btn);
+  });
+  document.getElementById('fwd-modal').classList.add('open');
+};
+
+window.closeFwdModal = function(){
+  document.getElementById('fwd-modal').classList.remove('open');
+  _fwdIdx=null;
+};
+
+window.fwdTask = async function(offsetDays){
+  if(_fwdIdx===null) return;
+  const srcKey=dk(viewDate);
+  if(!dayCache[srcKey]) return;
+  const task=dayCache[srcKey].tasks.splice(_fwdIdx,1)[0];
+  task.done=false;
+  // build dest date
+  const dest=new Date(viewDate); dest.setDate(dest.getDate()+offsetDays);
+  const destKey=dk(dest);
+  if(!dayCache[destKey]) dayCache[destKey]={tasks:[],rating:0};
+  dayCache[destKey].tasks.unshift(task);
+  renderTasks();
+  await saveDay(srcKey,dayCache[srcKey]);
+  await saveDay(destKey,dayCache[destKey]);
+  closeFwdModal();
 };
 
 window.toggleTaskInput = function(){
@@ -1401,5 +1523,14 @@ setTimeout(function(){
   if(a) a.style.opacity='1';
 }, 4000);
 </script>
+<div id="fwd-modal" onclick="if(event.target===this)closeFwdModal()">
+  <div id="fwd-inner">
+    <div id="fwd-title">forward task to</div>
+    <div id="fwd-preview"></div>
+    <div id="fwd-opts"></div>
+    <button id="fwd-cancel" onclick="closeFwdModal()">cancel</button>
+  </div>
+</div>
+
 </body>
 </html>
