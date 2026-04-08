@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#080808">
+<title>QTimer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#080808;--surface:#111;--surface2:#181818;
+  --border:#252525;--text:#ececec;--muted:#555;--muted2:#2e2e2e;
+  --bio:#4ade80;--chem:#60a5fa;--phy:#fb923c;--danger:#f87171
+}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;
+  min-height:100dvh;max-width:480px;margin:0 auto;display:flex;flex-direction:column;overflow-x:hidden}
+.main{flex:1;padding:36px 22px 96px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* NAV */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+  display:flex;border-top:1px solid var(--border);background:var(--bg);z-index:100}
+.nb{flex:1;padding:14px 0;background:none;border:none;color:var(--muted);
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:2.5px;
+  text-transform:uppercase;cursor:pointer;transition:color .15s;position:relative}
+.nb.active{color:var(--text)}
+.nb.active::after{content:'';position:absolute;top:0;left:20%;right:20%;height:1px;background:var(--text)}
+
+/* VIEWS */
+.view{display:none}
+.view.active{display:block;animation:fi .15s ease}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* TYPE */
+.ptitle{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:4px;line-height:1;margin-bottom:38px}
+.lbl{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+
+/* INPUTS */
+.igrp{margin-bottom:24px}
+input[type=text],input[type=number]{
+  width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);
+  padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:14px;
+  border-radius:3px;outline:none;transition:border-color .15s;-webkit-appearance:none;appearance:none}
+input:focus{border-color:#3a3a3a}
+
+/* SUBJECT GRID */
+.subj-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.subj-btn{padding:14px 0;background:var(--surface);border:1px solid var(--border);
+  color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;border-radius:3px;transition:all .12s}
+.s-bio{border-color:var(--bio)!important;color:var(--bio)!important;background:rgba(74,222,128,.06)!important}
+.s-chem{border-color:var(--chem)!important;color:var(--chem)!important;background:rgba(96,165,250,.06)!important}
+.s-phy{border-color:var(--phy)!important;color:var(--phy)!important;background:rgba(251,146,60,.06)!important}
+
+/* MODE TOGGLE */
+.mode-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mode-btn{padding:13px 0;background:var(--surface);border:1px solid var(--border);color:var(--muted);
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;
+  text-transform:uppercase;cursor:pointer;border-radius:3px;transition:all .12s}
+.mode-btn.on{border-color:var(--text);color:var(--text);background:var(--surface2)}
+
+/* BUTTONS */
+.bigbtn{width:100%;padding:18px;border:none;border-radius:3px;font-family:'Bebas Neue',sans-serif;
+  font-size:22px;letter-spacing:5px;cursor:pointer;transition:opacity .12s,transform .1s;display:block}
+.bigbtn:active{transform:scale(.98);opacity:.8}
+.btn-white{background:var(--text);color:var(--bg)}
+.btn-bio{background:var(--bio);color:#050505}
+.btn-chem{background:var(--chem);color:#050505}
+.btn-phy{background:var(--phy);color:#050505}
+.ghostbtn{width:100%;padding:13px;background:none;border:1px solid var(--border);
+  color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:3px;text-transform:uppercase;cursor:pointer;border-radius:3px;transition:all .12s}
+.ghostbtn:active{border-color:#444;color:var(--text)}
+.mb12{margin-bottom:12px}
+
+/* BADGES */
+.sbadge{font-size:8px;letter-spacing:2px;font-weight:700;text-transform:uppercase;
+  padding:5px 9px;border-radius:2px;flex-shrink:0}
+.sb-bio{background:rgba(74,222,128,.1);color:var(--bio);border:1px solid rgba(74,222,128,.2)}
+.sb-chem{background:rgba(96,165,250,.1);color:var(--chem);border:1px solid rgba(96,165,250,.2)}
+.sb-phy{background:rgba(251,146,60,.1);color:var(--phy);border:1px solid rgba(251,146,60,.2)}
+
+/* SESSION HEADER */
+.sess-hdr{display:flex;align-items:center;gap:10px;margin-bottom:42px}
+.chap-lbl{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* TIMER DISPLAY */
+.q-ind{font-size:12px;letter-spacing:2px;color:var(--muted);margin-bottom:4px}
+.timer-big{font-family:'Bebas Neue',sans-serif;font-size:96px;letter-spacing:2px;line-height:1;
+  transition:color .25s;user-select:none;margin-bottom:6px}
+.timer-sub{font-size:9px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:44px}
+
+/* STATS TABLE */
+.stats-tbl{border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-bottom:24px}
+.sr{display:flex;justify-content:space-between;padding:11px 15px;
+  border-bottom:1px solid var(--border);font-size:12px}
+.sr:last-child{border-bottom:none}
+.sk{color:var(--muted)} .sv{font-weight:700}
+
+/* Q LIST */
+.q-list{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.q-item{display:flex;justify-content:space-between;align-items:center;
+  padding:11px 14px;background:var(--surface);border:1px solid var(--border);
+  border-radius:3px;font-size:12px}
+.q-num{color:var(--muted)} .q-time{font-weight:700}
+
+/* TOTAL BAR */
+.tbar{display:flex;justify-content:space-between;align-items:center;
+  padding:14px 15px;border:1px solid var(--border);border-radius:3px;margin-bottom:22px}
+.tbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.tbv{font-size:14px;font-weight:700}
+
+/* TEST */
+.countdown{font-family:'Bebas Neue',sans-serif;font-size:88px;letter-spacing:2px;
+  line-height:1;margin-bottom:4px;user-select:none;transition:color .3s}
+.countdown.warn{color:var(--danger)}
+.t-elapsed{font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:14px}
+.now-bar{display:flex;align-items:center;gap:10px;margin-bottom:18px;min-height:26px}
+.now-lbl{font-size:9px;letter-spacing:3px;color:var(--muted);text-transform:uppercase}
+.now-val{font-size:13px;font-weight:700;letter-spacing:2px}
+.now-val.bio{color:var(--bio)} .now-val.chem{color:var(--chem)} .now-val.phy{color:var(--phy)}
+
+.mark-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.mark-btn{padding:14px 0;background:var(--surface);border:1px solid var(--border);
+  color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;border-radius:3px;transition:all .12s}
+.mark-btn:active{transform:scale(.96)}
+.mb-bio{border-color:var(--bio)!important;color:var(--bio)!important;background:rgba(74,222,128,.09)!important}
+.mb-chem{border-color:var(--chem)!important;color:var(--chem)!important;background:rgba(96,165,250,.09)!important}
+.mb-phy{border-color:var(--phy)!important;color:var(--phy)!important;background:rgba(251,146,60,.09)!important}
+
+.marks-log{border:1px solid var(--border);border-radius:3px;overflow:hidden;
+  margin-bottom:14px;max-height:180px;overflow-y:auto}
+.mark-item{display:flex;justify-content:space-between;align-items:center;
+  padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px}
+.mark-item:last-child{border-bottom:none}
+.mi-sub{font-weight:700}
+.mi-sub.bio{color:var(--bio)} .mi-sub.chem{color:var(--chem)} .mi-sub.phy{color:var(--phy)}
+.mi-at{color:var(--muted)}
+
+/* TEST SUMMARY */
+.sb-item{margin-bottom:14px}
+.sb-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px}
+.sb-name{font-weight:700}
+.sb-name.bio{color:var(--bio)} .sb-name.chem{color:var(--chem)} .sb-name.phy{color:var(--phy)}
+.sb-t{color:var(--muted)}
+.bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.bar-fill.bio{background:var(--bio)} .bar-fill.chem{background:var(--chem)} .bar-fill.phy{background:var(--phy)}
+
+/* HISTORY */
+.hist-empty{text-align:center;color:var(--muted);font-size:9px;letter-spacing:3px;
+  text-transform:uppercase;margin-top:60px}
+.hist-card{border:1px solid var(--border);border-radius:3px;margin-bottom:8px;overflow:hidden}
+.hist-hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:13px 15px;background:var(--surface);cursor:pointer;user-select:none}
+.hist-left{display:flex;flex-direction:column;gap:5px}
+.hist-top{display:flex;align-items:center;gap:8px;font-size:12px}
+.hbadge{font-size:7px;letter-spacing:2px;font-weight:700;padding:3px 6px;
+  border-radius:2px;text-transform:uppercase;flex-shrink:0}
+.hbadge-p{background:rgba(255,255,255,.07);color:var(--text)}
+.hbadge-t{background:rgba(250,204,21,.1);color:#fbbf24;border:1px solid rgba(250,204,21,.2)}
+.hist-date{font-size:9px;color:var(--muted);letter-spacing:1px}
+.hist-right{font-size:12px;font-weight:700;flex-shrink:0;margin-left:10px}
+.hist-body{display:none;padding:4px 15px 14px;background:var(--bg)}
+.hist-body.open{display:block}
+
+/* MODAL */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);
+  z-index:500;align-items:flex-end;justify-content:center}
+.modal-ov.open{display:flex}
+.modal-sheet{width:100%;max-width:480px;background:var(--surface);
+  border-top:1px solid var(--border);border-radius:12px 12px 0 0;
+  padding:28px 24px 40px;animation:sup .2s ease}
+@keyframes sup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;margin-bottom:20px}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.save-ind{font-size:9px;letter-spacing:2px;color:var(--muted);text-align:center;
+  margin-top:10px;text-transform:uppercase;height:14px}
+</style>
+</head>
+<body>
+<div class="main">
+
+  <!-- PRACTICE SETUP -->
+  <div class="view active" id="v-p-setup">
+    <div class="ptitle">QTIMER</div>
+    <div class="igrp">
+      <div class="lbl">Subject</div>
+      <div class="subj-grid">
+        <button class="subj-btn" data-s="bio"  onclick="pickSubj(this)">Bio</button>
+        <button class="subj-btn" data-s="chem" onclick="pickSubj(this)">Chem</button>
+        <button class="subj-btn" data-s="phy"  onclick="pickSubj(this)">Phy</button>
+      </div>
+    </div>
+    <div class="igrp">
+      <div class="lbl">Chapter</div>
+      <input type="text" id="p-chapter" placeholder="e.g. Biomolecules" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="igrp">
+      <div class="lbl">Timer Mode</div>
+      <div class="mode-toggle">
+        <button class="mode-btn on" id="mode-perq" onclick="setMode('perq')">Per Question</button>
+        <button class="mode-btn"    id="mode-bulk" onclick="setMode('bulk')">Bulk Log</button>
+      </div>
+    </div>
+    <div class="igrp" id="bulk-n-grp" style="display:none">
+      <div class="lbl">Log every N questions</div>
+      <input type="number" id="p-bulk-n" value="10" min="1" max="200">
+    </div>
+    <div class="igrp">
+      <div class="lbl">Starting from Q. #</div>
+      <input type="number" id="p-startq" value="1" min="1">
+    </div>
+    <button class="bigbtn btn-white" onclick="startPractice()">START SESSION</button>
+  </div>
+
+  <!-- PRACTICE ACTIVE — PER Q -->
+  <div class="view" id="v-p-active-perq">
+    <div class="sess-hdr">
+      <span class="sbadge" id="pq-badge"></span>
+      <span class="chap-lbl" id="pq-chap"></span>
+    </div>
+    <div class="q-ind" id="pq-qind">Q.1</div>
+    <div class="timer-big" id="pq-timer">00:00</div>
+    <div class="timer-sub">elapsed</div>
+    <button class="bigbtn mb12" id="pq-done" onclick="perqLog()">DONE ✓</button>
+    <button class="ghostbtn" onclick="endPractice()">END SESSION</button>
+    <div class="stats-tbl" id="pq-stats" style="display:none;margin-top:24px">
+      <div class="sr"><span class="sk">Questions done</span><span class="sv" id="pq-cnt">0</span></div>
+      <div class="sr"><span class="sk">Total time</span><span class="sv" id="pq-tot">—</span></div>
+      <div class="sr"><span class="sk">Avg / question</span><span class="sv" id="pq-avg">—</span></div>
+    </div>
+  </div>
+
+  <!-- PRACTICE ACTIVE — BULK -->
+  <div class="view" id="v-p-active-bulk">
+    <div class="sess-hdr">
+      <span class="sbadge" id="bk-badge"></span>
+      <span class="chap-lbl" id="bk-chap"></span>
+    </div>
+    <div class="q-ind" id="bk-qind">Q.1 →</div>
+    <div class="timer-big" id="bk-timer">00:00</div>
+    <div class="timer-sub">elapsed this chunk</div>
+    <button class="bigbtn mb12" id="bk-log-btn" onclick="openBulkModal()">LOG CHUNK</button>
+    <button class="ghostbtn" onclick="endPractice()">END SESSION</button>
+    <div class="stats-tbl" id="bk-stats" style="display:none;margin-top:24px">
+      <div class="sr"><span class="sk">Chunks logged</span><span class="sv" id="bk-chunks">0</span></div>
+      <div class="sr"><span class="sk">Questions done</span><span class="sv" id="bk-qdone">0</span></div>
+      <div class="sr"><span class="sk">Total time</span><span class="sv" id="bk-tot">—</span></div>
+      <div class="sr"><span class="sk">Avg / question</span><span class="sv" id="bk-avg">—</span></div>
+    </div>
+  </div>
+
+  <!-- PRACTICE SUMMARY -->
+  <div class="view" id="v-p-summary">
+    <div class="ptitle">SESSION<br>DONE</div>
+    <div class="lbl" id="sum-meta" style="margin-bottom:24px"></div>
+    <div class="q-list" id="sum-qlist"></div>
+    <div class="tbar">
+      <span class="tbl">Total</span>
+      <span class="tbv" id="sum-total">—</span>
+    </div>
+    <button class="bigbtn btn-white mb12" onclick="newPractice()">NEW SESSION</button>
+    <div class="save-ind" id="p-save-ind"></div>
+  </div>
+
+  <!-- TEST SETUP -->
+  <div class="view" id="v-t-setup">
+    <div class="ptitle">TEST<br>TIMER</div>
+    <div class="igrp">
+      <div class="lbl">Duration (minutes)</div>
+      <input type="number" id="t-dur" value="200" min="1" max="600">
+    </div>
+    <button class="bigbtn btn-white" onclick="startTest()">START TEST</button>
+  </div>
+
+  <!-- TEST ACTIVE -->
+  <div class="view" id="v-t-active">
+    <div class="lbl" style="margin-bottom:6px">Remaining</div>
+    <div class="countdown" id="t-countdown">3:20:00</div>
+    <div class="t-elapsed" id="t-elapsed">elapsed: 00:00</div>
+    <div class="now-bar">
+      <span class="now-lbl">Now</span>
+      <span class="now-val" id="now-val">—</span>
+    </div>
+    <div class="lbl">Mark subject switch</div>
+    <div class="mark-grid" style="margin-top:10px">
+      <button class="mark-btn" id="mb-bio"  onclick="markSubj('bio')">→ Bio</button>
+      <button class="mark-btn" id="mb-chem" onclick="markSubj('chem')">→ Chem</button>
+      <button class="mark-btn" id="mb-phy"  onclick="markSubj('phy')">→ Phy</button>
+    </div>
+    <div class="marks-log" id="marks-log" style="display:none"></div>
+    <button class="ghostbtn" onclick="endTest()" style="margin-top:8px">END TEST</button>
+  </div>
+
+  <!-- TEST SUMMARY -->
+  <div class="view" id="v-t-summary">
+    <div class="ptitle">TEST<br>DONE</div>
+    <div class="lbl" id="t-sum-meta" style="margin-bottom:28px"></div>
+    <div id="t-breakdown"></div>
+    <div class="tbar">
+      <span class="tbl">Total elapsed</span>
+      <span class="tbv" id="t-sum-total">—</span>
+    </div>
+    <button class="bigbtn btn-white mb12" onclick="newTest()">NEW TEST</button>
+    <div class="save-ind" id="t-save-ind"></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="view" id="v-history">
+    <div class="ptitle">HISTORY</div>
+    <div id="hist-list"></div>
+    <button class="ghostbtn" onclick="clearHistory()"
+      style="margin-top:14px;border-color:#2a1111;color:var(--danger)">Clear all history</button>
+  </div>
+
+</div>
+
+<!-- BULK MODAL -->
+<div class="modal-ov" id="modal-bulk" onclick="closeBulkModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-title">LOG CHUNK</div>
+    <div class="lbl">Questions in this chunk</div>
+    <input type="number" id="modal-qcount" min="1" value="10" style="margin-top:4px">
+    <div class="modal-actions">
+      <button class="bigbtn btn-white" style="flex:2;font-size:18px" onclick="confirmBulk()">CONFIRM</button>
+      <button class="ghostbtn" style="flex:1;margin:0"
+        onclick="document.getElementById('modal-bulk').classList.remove('open')">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<nav class="bnav">
+  <button class="nb active" id="nav-practice" onclick="navTo('practice')">Practice</button>
+  <button class="nb"        id="nav-test"     onclick="navTo('test')">Test</button>
+  <button class="nb"        id="nav-history"  onclick="navTo('history')">History</button>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyAi6R3Pujpy9O_hH9wgIdTtCsmhebxP2JE",
+  authDomain:"daily-tracker-7a406.firebaseapp.com",
+  projectId:"daily-tracker-7a406",
+  storageBucket:"daily-tracker-7a406.firebasestorage.app",
+  messagingSenderId:"794517135809",
+  appId:"1:794517135809:web:08b139ff5bef735ee18f40"
+});
+const db = firebase.firestore();
+
+const S = {
+  tab:'practice', pView:'setup', tView:'setup',
+  pSubj:null, pMode:'perq',
+  ps:null, pTick:null, pSecs:0,
+  ts:null, tTick:null, tSecs:0, tDur:0
+};
+
+// ── UTILS ──
+const pad = n => String(n).padStart(2,'0');
+const fmt  = s => `${pad(Math.floor(s/60))}:${pad(s%60)}`;
+const fmtH = s => { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),r=s%60; return h?`${h}:${pad(m)}:${pad(r)}`:`${pad(m)}:${pad(r)}`; };
+const smart  = s => s<60?`${s}s`:(s%60?`${Math.floor(s/60)}m ${s%60}s`:`${Math.floor(s/60)}m`);
+const smartH = s => s<3600?smart(s):(Math.floor((s%3600)/60)?`${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`:`${Math.floor(s/3600)}h`);
+
+// ── NAV ──
+function navTo(tab) {
+  S.tab = tab;
+  ['practice','test','history'].forEach(t =>
+    document.getElementById(`nav-${t}`).classList.toggle('active', t===tab));
+  if (tab==='practice') showView(`v-p-${S.pView}`);
+  else if (tab==='test') showView(`v-t-${S.tView}`);
+  else { renderHistory(); showView('v-history'); }
+}
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goPractice(name) {
+  S.pView=name; S.tab='practice';
+  ['practice','test','history'].forEach(t=>
+    document.getElementById(`nav-${t}`).classList.toggle('active',t==='practice'));
+  showView(`v-p-${name}`);
+}
+function goTest(name) {
+  S.tView=name; S.tab='test';
+  ['practice','test','history'].forEach(t=>
+    document.getElementById(`nav-${t}`).classList.toggle('active',t==='test'));
+  showView(`v-t-${name}`);
+}
+
+// ── PRACTICE SETUP ──
+function pickSubj(btn) {
+  document.querySelectorAll('.subj-btn').forEach(b=>b.className='subj-btn');
+  S.pSubj=btn.dataset.s;
+  btn.classList.add(`s-${S.pSubj}`);
+}
+function setMode(m) {
+  S.pMode=m;
+  document.getElementById('mode-perq').classList.toggle('on',m==='perq');
+  document.getElementById('mode-bulk').classList.toggle('on',m==='bulk');
+  document.getElementById('bulk-n-grp').style.display=m==='bulk'?'block':'none';
+}
+function startPractice() {
+  if (!S.pSubj) { alert('Pick a subject!'); return; }
+  const ch = document.getElementById('p-chapter').value.trim();
+  if (!ch) { alert('Enter chapter name!'); return; }
+  const startQ = Math.max(1,+document.getElementById('p-startq').value||1);
+  const bulkN  = Math.max(1,+document.getElementById('p-bulk-n').value||10);
+  S.ps = { subject:S.pSubj, chapter:ch, mode:S.pMode, bulkN, startQ, currentQ:startQ, logs:[], startTime:Date.now() };
+  if (S.pMode==='perq') {
+    setBadge('pq-badge',S.pSubj);
+    document.getElementById('pq-chap').textContent = ch;
+    document.getElementById('pq-done').className   = `bigbtn mb12 btn-${S.pSubj}`;
+    document.getElementById('pq-stats').style.display = 'none';
+    updPQ(); resetPTick('pq'); goPractice('active-perq');
+  } else {
+    setBadge('bk-badge',S.pSubj);
+    document.getElementById('bk-chap').textContent  = ch;
+    document.getElementById('bk-log-btn').className = `bigbtn mb12 btn-${S.pSubj}`;
+    document.getElementById('bk-stats').style.display = 'none';
+    updBQ(); resetPTick('bk'); goPractice('active-bulk');
+  }
+}
+function setBadge(id,s) {
+  const el=document.getElementById(id);
+  el.textContent=s.toUpperCase(); el.className=`sbadge sb-${s}`;
+}
+
+// ── PRACTICE TIMER ──
+function resetPTick(pfx) {
+  clearInterval(S.pTick); S.pSecs=0;
+  const el=document.getElementById(`${pfx}-timer`);
+  el.textContent='00:00'; el.style.color='';
+  S.pTick=setInterval(()=>{ S.pSecs++; el.textContent=fmt(S.pSecs); },1000);
+}
+function flash(id) {
+  const c={bio:'#4ade80',chem:'#60a5fa',phy:'#fb923c'};
+  const el=document.getElementById(id); el.style.color=c[S.ps.subject];
+  setTimeout(()=>el.style.color='',320);
+}
+
+// ── PER Q ──
+function updPQ() { document.getElementById('pq-qind').textContent=`Q.${S.ps.currentQ}`; }
+function perqLog() {
+  S.ps.logs.push({q:S.ps.currentQ,secs:S.pSecs}); S.ps.currentQ++;
+  updPQ(); flash('pq-timer'); resetPTick('pq'); updPQStats();
+}
+function updPQStats() {
+  const logs=S.ps.logs; if (!logs.length) return;
+  document.getElementById('pq-stats').style.display='block';
+  const tot=logs.reduce((a,l)=>a+l.secs,0);
+  document.getElementById('pq-cnt').textContent=logs.length;
+  document.getElementById('pq-tot').textContent=smart(tot);
+  document.getElementById('pq-avg').textContent=smart(Math.round(tot/logs.length));
+}
+
+// ── BULK ──
+function updBQ() {
+  const q=S.ps.currentQ,n=S.ps.bulkN;
+  document.getElementById('bk-qind').textContent=`Q.${q} → Q.${q+n-1}`;
+}
+function openBulkModal() {
+  document.getElementById('modal-qcount').value=S.ps.bulkN;
+  document.getElementById('modal-bulk').classList.add('open');
+  setTimeout(()=>document.getElementById('modal-qcount').select(),200);
+}
+function closeBulkModal(e) {
+  if (e && e.target!==document.getElementById('modal-bulk')) return;
+  document.getElementById('modal-bulk').classList.remove('open');
+}
+function confirmBulk() {
+  const count=Math.max(1,+document.getElementById('modal-qcount').value||S.ps.bulkN);
+  document.getElementById('modal-bulk').classList.remove('open');
+  const qStart=S.ps.currentQ, qEnd=qStart+count-1;
+  S.ps.logs.push({qStart,qEnd,count,secs:S.pSecs});
+  S.ps.currentQ=qEnd+1;
+  flash('bk-timer'); updBQ(); resetPTick('bk'); updBQStats();
+}
+function updBQStats() {
+  const logs=S.ps.logs; if (!logs.length) return;
+  document.getElementById('bk-stats').style.display='block';
+  const totS=logs.reduce((a,l)=>a+l.secs,0), totQ=logs.reduce((a,l)=>a+l.count,0);
+  document.getElementById('bk-chunks').textContent=logs.length;
+  document.getElementById('bk-qdone').textContent=totQ;
+  document.getElementById('bk-tot').textContent=smart(totS);
+  document.getElementById('bk-avg').textContent=totQ?smart(Math.round(totS/totQ)):'—';
+}
+
+// ── END PRACTICE ──
+function endPractice() {
+  if (!S.ps.logs.length && !confirm('No logs yet. End anyway?')) return;
+  clearInterval(S.pTick);
+  const rec={type:'practice',...S.ps,endTime:Date.now()};
+  buildPracticeSummary(rec);
+  saveSession(rec,'p-save-ind');
+}
+function buildPracticeSummary(rec) {
+  document.getElementById('sum-meta').textContent=`${rec.subject.toUpperCase()} · ${rec.chapter} · ${rec.mode==='perq'?'per question':'bulk'}`;
+  const list=document.getElementById('sum-qlist'); list.innerHTML='';
+  let tot=0,totQ=0;
+  if (rec.mode==='perq') {
+    rec.logs.forEach(l=>{ tot+=l.secs; totQ++; list.appendChild(mkQItem(`Q.${l.q}`,smart(l.secs))); });
+  } else {
+    rec.logs.forEach(l=>{
+      tot+=l.secs; totQ+=l.count;
+      const lbl=l.count===1?`Q.${l.qStart}`:`Q.${l.qStart}–${l.qEnd}`;
+      list.appendChild(mkQItem(`${lbl} <span style="color:var(--muted2)">(${l.count}Q)</span>`,smart(l.secs)));
+    });
+  }
+  document.getElementById('sum-total').textContent=tot?`${smart(tot)} · ${totQ} Q`:'—';
+  goPractice('summary');
+}
+function mkQItem(numHTML,timeStr) {
+  const el=document.createElement('div'); el.className='q-item';
+  el.innerHTML=`<span class="q-num">${numHTML}</span><span class="q-time">${timeStr}</span>`;
+  return el;
+}
+function newPractice() { S.ps=null; goPractice('setup'); }
+
+// ── TEST ──
+function startTest() {
+  const mins=Math.max(1,+document.getElementById('t-dur').value||200);
+  S.tDur=mins*60; S.tSecs=0;
+  S.ts={durationSecs:S.tDur,marks:[],startTime:Date.now()};
+  ['bio','chem','phy'].forEach(s=>document.getElementById(`mb-${s}`).className='mark-btn');
+  const nv=document.getElementById('now-val'); nv.textContent='—'; nv.className='now-val';
+  document.getElementById('marks-log').style.display='none';
+  document.getElementById('marks-log').innerHTML='';
+  clearInterval(S.tTick); updTest();
+  S.tTick=setInterval(()=>{ S.tSecs++; updTest(); if(S.tSecs>=S.tDur){clearInterval(S.tTick);endTest();} },1000);
+  goTest('active');
+}
+function updTest() {
+  const rem=Math.max(0,S.tDur-S.tSecs);
+  const cd=document.getElementById('t-countdown');
+  cd.textContent=fmtH(rem); cd.classList.toggle('warn',rem<=300&&rem>0);
+  document.getElementById('t-elapsed').textContent=`elapsed: ${fmtH(S.tSecs)}`;
+}
+function markSubj(s) {
+  S.ts.marks.push({subject:s,elapsed:S.tSecs});
+  ['bio','chem','phy'].forEach(b=>document.getElementById(`mb-${b}`).className=`mark-btn${b===s?` mb-${b}`:''}`);
+  const nv=document.getElementById('now-val'); nv.textContent=s.toUpperCase(); nv.className=`now-val ${s}`;
+  const log=document.getElementById('marks-log'); log.style.display='block';
+  const item=document.createElement('div'); item.className='mark-item';
+  item.innerHTML=`<span class="mi-sub ${s}">${s.toUpperCase()}</span><span class="mi-at">at ${fmtH(S.tSecs)}</span>`;
+  log.insertBefore(item,log.firstChild);
+}
+function endTest() {
+  clearInterval(S.tTick);
+  const rec={type:'test',...S.ts,actualElapsed:S.tSecs,endTime:Date.now()};
+  buildTestSummary(rec);
+  saveSession(rec,'t-save-ind');
+}
+function buildTestSummary(rec) {
+  document.getElementById('t-sum-meta').textContent=`${smartH(rec.durationSecs)} test · ${smartH(rec.actualElapsed)} elapsed`;
+  const bd=document.getElementById('t-breakdown'); bd.innerHTML='';
+  const segs=computeSegs(rec.marks,rec.actualElapsed);
+  const tots={bio:0,chem:0,phy:0};
+  segs.forEach(s=>tots[s.subject]=(tots[s.subject]||0)+s.secs);
+  const maxS=Math.max(...Object.values(tots),1);
+  const names={bio:'Biology',chem:'Chemistry',phy:'Physics'};
+  ['bio','chem','phy'].forEach(s=>{
+    if (!tots[s]) return;
+    const pct=Math.round((tots[s]/maxS)*100);
+    const el=document.createElement('div'); el.className='sb-item';
+    el.innerHTML=`<div class="sb-hdr"><span class="sb-name ${s}">${names[s]}</span><span class="sb-t">${smartH(tots[s])}</span></div><div class="bar-bg"><div class="bar-fill ${s}" style="width:0"></div></div>`;
+    bd.appendChild(el);
+    setTimeout(()=>el.querySelector('.bar-fill').style.width=`${pct}%`,50);
+  });
+  const marked=Object.values(tots).reduce((a,b)=>a+b,0), untrack=rec.actualElapsed-marked;
+  if (untrack>10&&rec.marks.length) {
+    const el=document.createElement('div'); el.className='q-item'; el.style.marginTop='10px';
+    el.innerHTML=`<span class="q-num">Untracked</span><span class="q-time" style="color:var(--muted)">${smartH(untrack)}</span>`;
+    bd.appendChild(el);
+  }
+  if (!rec.marks.length) bd.innerHTML=`<div style="color:var(--muted);font-size:11px;padding:10px 0">No subject marks recorded</div>`;
+  document.getElementById('t-sum-total').textContent=smartH(rec.actualElapsed);
+  goTest('summary');
+}
+function computeSegs(marks,total) {
+  if (!marks.length) return [];
+  const s=[...marks].sort((a,b)=>a.elapsed-b.elapsed);
+  return s.map((m,i)=>({subject:m.subject,secs:(i<s.length-1?s[i+1].elapsed:total)-m.elapsed}));
+}
+function newTest() { S.ts=null; goTest('setup'); }
+
+// ── FIREBASE SAVE ──
+async function saveSession(rec,indId) {
+  const el=document.getElementById(indId);
+  if (el) el.textContent='Saving...';
+  try {
+    await db.collection('qtimer_sessions').add({...rec,savedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    if (el) { el.textContent='Saved ✓'; setTimeout(()=>el.textContent='',3000); }
+  } catch(e) {
+    console.error(e);
+    if (el) el.textContent='Save failed — check connection';
+  }
+}
+
+// ── HISTORY ──
+async function renderHistory() {
+  const list=document.getElementById('hist-list');
+  list.innerHTML='<div class="hist-empty">Loading...</div>';
+  try {
+    const snap=await db.collection('qtimer_sessions').orderBy('endTime','desc').limit(80).get();
+    if (snap.empty) { list.innerHTML='<div class="hist-empty">No sessions yet</div>'; return; }
+    list.innerHTML='';
+    snap.forEach(doc=>list.appendChild(buildHistCard(doc.data())));
+  } catch(e) { list.innerHTML='<div class="hist-empty">Failed to load</div>'; console.error(e); }
+}
+function buildHistCard(r) {
+  const card=document.createElement('div'); card.className='hist-card';
+  const d=new Date(r.endTime);
+  const ds=d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})
+    +' · '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  let title='',right='',body='';
+  if (r.type==='practice') {
+    const totS=r.logs.reduce((a,l)=>a+l.secs,0);
+    const totQ=r.mode==='perq'?r.logs.length:r.logs.reduce((a,l)=>a+(l.count||1),0);
+    title=`<span class="hbadge hbadge-p">${r.subject.toUpperCase()}</span><span>${r.chapter}</span>`;
+    right=smart(totS);
+    body=(r.mode==='perq'
+      ?r.logs.map(l=>`<div class="q-item"><span class="q-num">Q.${l.q}</span><span class="q-time">${smart(l.secs)}</span></div>`).join('')
+      :r.logs.map(l=>{const lb=l.count===1?`Q.${l.qStart}`:`Q.${l.qStart}–${l.qEnd}`;return `<div class="q-item"><span class="q-num">${lb}</span><span class="q-time">${smart(l.secs)}</span></div>`;}).join('')
+    )+`<div style="padding:10px 0 2px;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase">${totQ} Q · ${r.mode}</div>`;
+  } else {
+    title=`<span class="hbadge hbadge-t">TEST</span><span>${smartH(r.durationSecs)}</span>`;
+    right=smartH(r.actualElapsed);
+    const segs=computeSegs(r.marks||[],r.actualElapsed), tots={bio:0,chem:0,phy:0};
+    segs.forEach(s=>tots[s.subject]=(tots[s.subject]||0)+s.secs);
+    const sn={bio:'Bio',chem:'Chem',phy:'Phy'};
+    body=['bio','chem','phy'].filter(s=>tots[s])
+      .map(s=>`<div class="q-item"><span class="q-num" style="color:var(--${s})">${sn[s]}</span><span class="q-time">${smartH(tots[s])}</span></div>`)
+      .join('') || `<div style="padding:10px 0;color:var(--muted);font-size:11px">No marks recorded</div>`;
+  }
+  card.innerHTML=`
+    <div class="hist-hdr" onclick="this.nextElementSibling.classList.toggle('open')">
+      <div class="hist-left">
+        <div class="hist-top">${title}</div>
+        <div class="hist-date">${ds}</div>
+      </div>
+      <div class="hist-right">${right}</div>
+    </div>
+    <div class="hist-body">${body}</div>`;
+  return card;
+}
+async function clearHistory() {
+  if (!confirm('Delete all sessions from Firebase?')) return;
+  try {
+    const snap=await db.collection('qtimer_sessions').get();
+    const batch=db.batch(); snap.forEach(d=>batch.delete(d.ref)); await batch.commit();
+    renderHistory();
+  } catch(e) { alert('Failed: '+e.message); }
+}
+
+// ── PWA ──
+const _mf={name:'QTimer',short_name:'QTimer',start_url:'.',display:'standalone',background_color:'#080808',theme_color:'#080808',
+  icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23080808'/><text y='.9em' font-size='80' x='8'>⏱</text></svg>",sizes:'192x192',type:'image/svg+xml'}]};
+const _ml=document.createElement('link');
+_ml.rel='manifest'; _ml.href=URL.createObjectURL(new Blob([JSON.stringify(_mf)],{type:'application/json'}));
+document.head.appendChild(_ml);
+if('serviceWorker' in navigator)
+  navigator.serviceWorker.register(URL.createObjectURL(new Blob([`self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response(''))))`],{type:'application/javascript'}))).catch(()=>{});
+</script>
+</body>
+</html>
